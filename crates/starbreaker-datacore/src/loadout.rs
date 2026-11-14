@@ -447,7 +447,16 @@ fn resolve_sub_geometry(idx: &EntityIndex, children: &mut [LoadoutNode]) {
             .filter(|(j, c)| *j != ui && c.entity_name == entity)
             .filter_map(|(_, c)| c.geometry_path.clone())
             .collect();
-        if let Some(v) = variants.iter().find(|v| !claimed.contains(&v.geometry_path)) {
+        // Krill patch: of the unclaimed variants, prefer a working ship/vehicle model over a destroyed state or a
+        // building's part (the 100i's hull door listed "destroyed disable: buildingsets/.../door_double_a.cga" first).
+        let penalty = |v: &&SubGeometryVariant| -> u8 {
+            let tag = v.tag.to_ascii_lowercase();
+            let path = v.geometry_path.to_ascii_lowercase().replace('\\', "/");
+            let broken = ["destroyed", "damaged", "disable", "broken"].iter().any(|w| tag.contains(w));
+            let ours = path.contains("/spaceships/") || path.contains("/vehicles/") || path.starts_with("spaceships/") || path.starts_with("vehicles/");
+            (broken as u8) * 2 + (!ours as u8)
+        };
+        if let Some(v) = variants.iter().filter(|v| !claimed.contains(&v.geometry_path)).min_by_key(penalty) {
             log::info!("  SubGeometry: {} tag='{}' (fallback, unclaimed) -> {}", entity, v.tag, v.geometry_path);
             children[ui].geometry_path = Some(v.geometry_path.clone());
             if !v.material_path.is_empty() { children[ui].material_path = Some(v.material_path.clone()); }
