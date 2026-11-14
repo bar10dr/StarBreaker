@@ -130,7 +130,13 @@ pub(crate) fn load_interiors(
             .or_default()
             .push(*reference_transform);
     }
-    for (container, container_transform, _, parent_entity_name, parent_node_name) in &container_instances {
+    // Krill patch: the bundled GLB puts every interior container at the scene root (gltf::attach_interiors), so a
+    // container hung on a hull helper bone needs its root-space transform (helper x offset), not the helper-relative
+    // one; with a helper that duplicates the offset the relative one is the identity and the interior landed at the
+    // ship's origin (Origin 100i: the cockpit 3.9 m too far back). Containers without a helper are unchanged.
+    for (container, _helper_relative, container_transform, _parent_entity, _parent_node) in &container_instances {
+        let parent_entity_name: Option<String> = None;
+        let parent_node_name: Option<String> = None;
         let reference_candidates = root_item_port_reference_candidates
             .get(&container.file_name.to_ascii_lowercase())
             .map(Vec::as_slice)
